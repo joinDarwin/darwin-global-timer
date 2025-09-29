@@ -9,5 +9,5 @@
     "app/api/admin/monitoring/route.ts": {
       "maxDuration": 10
     }
-  },
+  }
 }
