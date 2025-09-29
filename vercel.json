@@ -10,8 +10,4 @@
       "maxDuration": 10
     }
   },
-  "env": {
-    "TIMER_SERVICE_URL": "@timer-service-url",
-    "SOLANA_MONITOR_SERVICE_URL": "@solana-monitor-service-url"
-  }
 }
