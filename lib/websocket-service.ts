@@ -15,14 +15,42 @@ export class WebSocketService {
   private reconnectDelay = 1000
   private onMessage: ((message: TimerSyncMessage) => void) | null = null
   private clientId: string
+  private pollingInterval: NodeJS.Timeout | null = null
+  private usePolling = true // Switch to polling mode
 
   constructor() {
     this.clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    this.connect()
+    if (this.usePolling) {
+      this.startPolling()
+    } else {
+      this.connect()
+    }
   }
 
   setMessageHandler(handler: (message: TimerSyncMessage) => void) {
     this.onMessage = handler
+  }
+
+  private startPolling() {
+    console.log('Starting timer polling...')
+    this.pollingInterval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/timer')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && this.onMessage) {
+            this.onMessage({
+              type: 'update',
+              timestamp: Date.now(),
+              data: data.data,
+              clientId: this.clientId
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Polling error:', error)
+      }
+    }, 2000) // Poll every 2 seconds
   }
 
   private connect() {
@@ -91,6 +119,10 @@ export class WebSocketService {
     if (this.eventSource) {
       this.eventSource.close()
       this.eventSource = null
+    }
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval)
+      this.pollingInterval = null
     }
   }
 }
