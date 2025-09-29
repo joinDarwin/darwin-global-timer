@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server'
-import { ProductionGlobalTimerService } from '@/lib/global-timer-service-prod'
 
 export async function GET() {
   try {
-    const timerService = ProductionGlobalTimerService.getInstance()
-    const stats = await timerService.getStats()
-    const events = await timerService.getRecentEvents(100)
+    const timerServiceUrl = process.env.TIMER_SERVICE_URL
+    if (!timerServiceUrl) {
+      throw new Error('TIMER_SERVICE_URL not configured')
+    }
+    
+    const [statsResponse, eventsResponse] = await Promise.all([
+      fetch(`${timerServiceUrl}/api/timer/stats`),
+      fetch(`${timerServiceUrl}/api/timer/events?limit=100`)
+    ])
+    
+    if (!statsResponse.ok || !eventsResponse.ok) {
+      throw new Error('Failed to fetch data from timer service')
+    }
+    
+    const stats = await statsResponse.json()
+    const events = await eventsResponse.json()
     
     // Calculate metrics
     const metrics = {
@@ -14,17 +26,17 @@ export async function GET() {
       
       // Timer metrics
       timer: {
-        isActive: stats.uptime > 0,
-        uptime: stats.uptime,
-        totalResets: stats.totalResets,
-        lastReset: stats.lastReset,
-        connectedClients: stats.connectedClients,
-        activeInstances: stats.activeInstances
+        isActive: stats.data.uptime > 0,
+        uptime: stats.data.uptime,
+        totalResets: stats.data.totalResets,
+        lastReset: stats.data.lastReset,
+        connectedClients: stats.data.connectedClients,
+        activeInstances: stats.data.instanceId
       },
       
       // System metrics
       system: {
-        redisAvailable: stats.redisAvailable,
+        redisAvailable: stats.data.redisAvailable,
         nodeEnv: process.env.NODE_ENV,
         memoryUsage: process.memoryUsage(),
         uptime: process.uptime()
@@ -32,9 +44,9 @@ export async function GET() {
       
       // Event metrics
       events: {
-        total: events.length,
-        resets: events.filter(e => e.event === 'reset').length,
-        recent: events.slice(0, 10).map(e => ({
+        total: events.data.length,
+        resets: events.data.filter((e: any) => e.event === 'reset').length,
+        recent: events.data.slice(0, 10).map((e: any) => ({
           event: e.event,
           timestamp: e.timestamp,
           instanceId: e.instanceId
@@ -43,8 +55,8 @@ export async function GET() {
       
       // Performance metrics
       performance: {
-        avgResetInterval: calculateAverageResetInterval(events),
-        resetFrequency: calculateResetFrequency(events),
+        avgResetInterval: calculateAverageResetInterval(events.data),
+        resetFrequency: calculateResetFrequency(events.data),
         systemLoad: process.cpuUsage()
       }
     }

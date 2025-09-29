@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ProductionGlobalTimerService } from '@/lib/global-timer-service-prod'
-
-const globalTimer = ProductionGlobalTimerService.getInstance()
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +10,20 @@ export async function POST(request: NextRequest) {
     if (webhookData.type === 'TRANSFER' || webhookData.type === 'SWAP') {
       console.log('✅ Token transaction detected via webhook')
       
-      // Reset the timer
-      await globalTimer.resetTimer()
-      console.log('🔄 Timer reset via webhook notification')
+      // Reset the timer via the timer service
+      const timerServiceUrl = process.env.TIMER_SERVICE_URL
+      if (timerServiceUrl) {
+        const response = await fetch(`${timerServiceUrl}/api/timer/reset`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        
+        if (response.ok) {
+          console.log('🔄 Timer reset via webhook notification')
+        } else {
+          console.error('❌ Failed to reset timer via webhook')
+        }
+      }
       
       return NextResponse.json({ 
         success: true, 
