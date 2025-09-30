@@ -117,7 +117,7 @@ class TimerService {
     }
   }
 
-  async resetTimer() {
+  async resetTimer(tradeInfo = null) {
     console.log(`[${this.getInstanceId()}] Resetting global timer`);
     
     const resetState = {
@@ -126,7 +126,8 @@ class TimerService {
       isActive: true,
       lastSwapTime: Date.now(),
       serverTime: Date.now(),
-      instanceId: this.getInstanceId()
+      instanceId: this.getInstanceId(),
+      lastTrade: tradeInfo || null
     };
 
     // Store reset state in Redis
@@ -329,7 +330,7 @@ app.post('/api/trade-detected', async (req, res) => {
     const { tradeInfo } = req.body;
     console.log('🎣 Trade detected, resetting timer:', tradeInfo);
     
-    const newState = await timerService.resetTimer();
+    const newState = await timerService.resetTimer(tradeInfo);
     res.json({ 
       success: true, 
       message: 'Timer reset due to trade detection',

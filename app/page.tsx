@@ -1,8 +1,23 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Bitcoin, Clock, Trophy, User, X, Send, Target, Wheat } from "lucide-react"
-import { TimerProvider } from "@/contexts/TimerContext"
+import { TimerProvider, useTimer } from "@/contexts/TimerContext"
 import { VaultTimer } from "@/components/VaultTimer"
+
+function LastBidderDisplay() {
+  const { lastBuyer } = useTimer()
+  
+  const formatAddress = (address: string | null) => {
+    if (!address) return "No trades yet"
+    return `${address.slice(0, 4)}...${address.slice(-4)}`
+  }
+  
+  return (
+    <div className="text-white font-bold text-base">
+      {formatAddress(lastBuyer)}
+    </div>
+  )
+}
 
 export default function MicroScratchetyPage() {
   return (
@@ -113,7 +128,7 @@ export default function MicroScratchetyPage() {
                 <User className="w-3 h-3 text-gray-500" />
                 <span className="text-gray-400 text-xs font-medium">Last Bidder</span>
               </div>
-              <div className="text-white font-bold text-base">08x0ds9d8...</div>
+              <LastBidderDisplay />
             </Card>
           </div>
 

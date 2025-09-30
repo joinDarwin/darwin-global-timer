@@ -332,6 +332,9 @@ class SolanaMonitorService {
         }
       }
 
+      // Extract buyer/seller account (first account is typically the transaction signer)
+      const buyer = message.accountKeys[0] ? message.accountKeys[0].toString() : null;
+
       // Only consider significant trades
       if (amount < 0.001) {
         return null;
@@ -342,7 +345,8 @@ class SolanaMonitorService {
         amount, 
         dex, 
         signature,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        buyer
       };
 
     } catch (error) {

@@ -11,6 +11,7 @@ export interface TradeInfo {
   signature: string
   timestamp: number
   price?: number
+  buyer?: string  // Account address of the buyer/seller
 }
 
 // GlobalTimerState interface (moved from global-timer-service-prod)
@@ -21,6 +22,7 @@ export interface GlobalTimerState {
   lastSwapTime: number | null
   serverTime: number
   instanceId: string
+  lastTrade: TradeInfo | null
 }
 
 interface TimerContextType {
@@ -29,6 +31,7 @@ interface TimerContextType {
   resetTimer: () => void
   lastSwapTime: number | null
   lastTrade: TradeInfo | null
+  lastBuyer: string | null
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined)
@@ -40,6 +43,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [isActive, setIsActive] = useState(true)
   const [lastSwapTime, setLastSwapTime] = useState<number | null>(null)
   const [lastTrade, setLastTrade] = useState<TradeInfo | null>(null)
+  const [lastBuyer, setLastBuyer] = useState<string | null>(null)
   const [serverTime, setServerTime] = useState<number>(Date.now())
   const wsServiceRef = useRef<ReturnType<typeof getWebSocketService> | null>(null)
 
@@ -64,6 +68,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     setServerTime(state.serverTime)
     setLastSwapTime(state.lastSwapTime)
     setIsActive(state.isActive)
+    
+    // Update trade information if available
+    if (state.lastTrade) {
+      setLastTrade(state.lastTrade)
+      if (state.lastTrade.buyer) {
+        setLastBuyer(state.lastTrade.buyer)
+      }
+    }
     
     // Calculate time left based on server time
     const elapsed = state.serverTime - state.startTime
@@ -128,7 +140,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     isActive,
     resetTimer,
     lastSwapTime,
-    lastTrade
+    lastTrade,
+    lastBuyer
   }
 
   return (
