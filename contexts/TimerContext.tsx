@@ -54,6 +54,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   // Function to update local state from server state
   const updateFromServerState = useCallback((state: GlobalTimerState) => {
+    console.log('🔄 Updating from server state:', {
+      startTime: state.startTime,
+      serverTime: state.serverTime,
+      duration: state.duration,
+      isActive: state.isActive
+    })
+    
     setServerTime(state.serverTime)
     setLastSwapTime(state.lastSwapTime)
     setIsActive(state.isActive)
@@ -61,6 +68,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     // Calculate time left based on server time
     const elapsed = state.serverTime - state.startTime
     const remaining = Math.max(0, state.duration - elapsed)
+    console.log('⏰ Calculated time left:', remaining, 'ms (', Math.floor(remaining / 60000), 'min', Math.floor((remaining % 60000) / 1000), 'sec)')
     setTimeLeft(remaining)
   }, [])
 
