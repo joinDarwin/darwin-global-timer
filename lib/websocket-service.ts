@@ -11,12 +11,12 @@ export interface TimerSyncMessage {
 export class WebSocketService {
   private eventSource: EventSource | null = null
   private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectDelay = 1000
+  private maxReconnectAttempts = 10
+  private reconnectDelay = 2000
   private onMessage: ((message: TimerSyncMessage) => void) | null = null
   private clientId: string
   private pollingInterval: NodeJS.Timeout | null = null
-  private usePolling = true // Switch to polling mode
+  private usePolling = false // Use SSE for real-time updates
 
   constructor() {
     this.clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -61,6 +61,15 @@ export class WebSocketService {
       this.eventSource.onopen = () => {
         console.log('Connected to global timer service')
         this.reconnectAttempts = 0
+        // Send initial message to confirm connection
+        if (this.onMessage) {
+          this.onMessage({
+            type: 'initial',
+            timestamp: Date.now(),
+            clientId: this.clientId,
+            message: 'Connected to timer service'
+          })
+        }
       }
 
       this.eventSource.onmessage = (event) => {
