@@ -17,8 +17,10 @@ export class WebSocketService {
   private clientId: string
   private pollingInterval: NodeJS.Timeout | null = null
   private usePolling = false // Use SSE for real-time updates
+  private fallbackToPolling = false // Fallback to polling if SSE fails
   private isConnecting = false
   private connectionState: 'disconnected' | 'connecting' | 'connected' = 'disconnected'
+  private sseRetryInterval: NodeJS.Timeout | null = null
 
   constructor() {
     this.clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -34,7 +36,7 @@ export class WebSocketService {
   }
 
   private startPolling() {
-    console.log('Starting timer polling...')
+    console.log('🔄 Starting timer polling fallback...')
     this.pollingInterval = setInterval(async () => {
       try {
         const response = await fetch('/api/timer')
@@ -53,6 +55,17 @@ export class WebSocketService {
         console.error('Polling error:', error)
       }
     }, 2000) // Poll every 2 seconds
+  }
+
+  // Method to retry SSE connection from polling mode
+  retrySSEConnection() {
+    if (this.fallbackToPolling) {
+      console.log('🔄 Retrying SSE connection from polling mode...')
+      this.fallbackToPolling = false
+      this.reconnectAttempts = 0
+      this.disconnect()
+      this.connect()
+    }
   }
 
   private connect() {
@@ -122,9 +135,18 @@ export class WebSocketService {
         this.connect()
       }, delay)
     } else {
-      console.error('❌ Max reconnection attempts reached. Switching to fallback mode.')
+      console.error('❌ Max reconnection attempts reached. Switching to polling fallback.')
       this.connectionState = 'disconnected'
-      // Could implement fallback to polling here if needed
+      this.fallbackToPolling = true
+      this.startPolling()
+      
+      // Try to reconnect to SSE every 30 seconds while in polling mode
+      this.sseRetryInterval = setInterval(() => {
+        if (this.fallbackToPolling) {
+          console.log('🔄 Periodic SSE retry attempt...')
+          this.retrySSEConnection()
+        }
+      }, 30000) // Try every 30 seconds
     }
   }
 
@@ -160,6 +182,10 @@ export class WebSocketService {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval)
       this.pollingInterval = null
+    }
+    if (this.sseRetryInterval) {
+      clearInterval(this.sseRetryInterval)
+      this.sseRetryInterval = null
     }
   }
 }
