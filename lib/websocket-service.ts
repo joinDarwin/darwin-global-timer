@@ -11,7 +11,7 @@ export interface TimerSyncMessage {
 export class WebSocketService {
   private eventSource: EventSource | null = null
   private reconnectAttempts = 0
-  private maxReconnectAttempts = 5 // Reduce max attempts to prevent resource exhaustion
+  private maxReconnectAttempts = 3 // Further reduce attempts to fail faster and switch to polling
   private reconnectDelay = 3000 // Increase delay between attempts
   private onMessage: ((message: TimerSyncMessage) => void) | null = null
   private clientId: string
@@ -54,7 +54,7 @@ export class WebSocketService {
       } catch (error) {
         console.error('Polling error:', error)
       }
-    }, 2000) // Poll every 2 seconds
+    }, 1000) // Poll every 1 second for more responsive updates
   }
 
   // Method to retry SSE connection from polling mode
@@ -115,7 +115,15 @@ export class WebSocketService {
         console.error('❌ EventSource error:', error)
         this.isConnecting = false
         this.connectionState = 'disconnected'
-        this.handleReconnect()
+        
+        // If this is the first error, immediately switch to polling for reliability
+        if (this.reconnectAttempts === 0) {
+          console.log('🔄 First SSE error detected, switching to polling for reliability')
+          this.fallbackToPolling = true
+          this.startPolling()
+        } else {
+          this.handleReconnect()
+        }
       }
 
     } catch (error) {
