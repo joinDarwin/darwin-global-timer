@@ -11,12 +11,14 @@ export interface TimerSyncMessage {
 export class WebSocketService {
   private eventSource: EventSource | null = null
   private reconnectAttempts = 0
-  private maxReconnectAttempts = 10
-  private reconnectDelay = 2000
+  private maxReconnectAttempts = 5 // Reduce max attempts to prevent resource exhaustion
+  private reconnectDelay = 3000 // Increase delay between attempts
   private onMessage: ((message: TimerSyncMessage) => void) | null = null
   private clientId: string
   private pollingInterval: NodeJS.Timeout | null = null
   private usePolling = false // Use SSE for real-time updates
+  private isConnecting = false
+  private connectionState: 'disconnected' | 'connecting' | 'connected' = 'disconnected'
 
   constructor() {
     this.clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -54,13 +56,28 @@ export class WebSocketService {
   }
 
   private connect() {
+    // Prevent multiple simultaneous connection attempts
+    if (this.isConnecting || this.connectionState === 'connected') {
+      console.log('Connection already in progress or established')
+      return
+    }
+
+    this.isConnecting = true
+    this.connectionState = 'connecting'
+    
+    // Clean up any existing connection first
+    this.disconnect()
+    
     try {
       const url = `/api/timer/websocket?clientId=${this.clientId}`
+      console.log('Attempting to connect to:', url)
       this.eventSource = new EventSource(url)
 
       this.eventSource.onopen = () => {
-        console.log('Connected to global timer service')
+        console.log('✅ Connected to global timer service')
         this.reconnectAttempts = 0
+        this.isConnecting = false
+        this.connectionState = 'connected'
         // Send initial message to confirm connection
         if (this.onMessage) {
           this.onMessage({
@@ -82,12 +99,16 @@ export class WebSocketService {
       }
 
       this.eventSource.onerror = (error) => {
-        console.error('EventSource error:', error)
+        console.error('❌ EventSource error:', error)
+        this.isConnecting = false
+        this.connectionState = 'disconnected'
         this.handleReconnect()
       }
 
     } catch (error) {
-      console.error('WebSocket connection failed:', error)
+      console.error('❌ WebSocket connection failed:', error)
+      this.isConnecting = false
+      this.connectionState = 'disconnected'
       this.handleReconnect()
     }
   }
@@ -95,12 +116,15 @@ export class WebSocketService {
   private handleReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++
+      const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1) // Exponential backoff
+      console.log(`🔄 Attempting to reconnect in ${delay}ms... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
       setTimeout(() => {
-        console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
         this.connect()
-      }, this.reconnectDelay * this.reconnectAttempts)
+      }, delay)
     } else {
-      console.error('Max reconnection attempts reached')
+      console.error('❌ Max reconnection attempts reached. Switching to fallback mode.')
+      this.connectionState = 'disconnected'
+      // Could implement fallback to polling here if needed
     }
   }
 
@@ -125,6 +149,10 @@ export class WebSocketService {
   }
 
   disconnect() {
+    console.log('🔌 Disconnecting WebSocket service')
+    this.isConnecting = false
+    this.connectionState = 'disconnected'
+    
     if (this.eventSource) {
       this.eventSource.close()
       this.eventSource = null
